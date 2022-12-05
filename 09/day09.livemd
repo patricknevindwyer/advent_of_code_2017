@@ -1,0 +1,117 @@
+# Day 09
+
+## Data
+
+```elixir
+data =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+```
+
+* `{` and `}`
+* `<` and `>`
+* `,` for group delimiters
+* `!` for escapes
+
+```elixir
+defmodule GarbagePatch do
+  def tokenize(patch) when is_binary(patch) do
+    patch |> String.graphemes() |> tokenize()
+  end
+
+  def tokenize([]), do: [:program_end]
+
+  def tokenize(["{" | rest]) do
+    [:group_start] ++ tokenize(rest)
+  end
+
+  def tokenize(["<" | rest]) do
+    [:garbage_start] ++ consume_garbage(rest)
+  end
+
+  def tokenize(["}" | rest]) do
+    [:group_end] ++ tokenize(rest)
+  end
+
+  def tokenize(["!", c | rest]) do
+    [:escape, c] ++ tokenize(rest)
+  end
+
+  def tokenize(["," | rest]) do
+    [:comma] ++ tokenize(rest)
+  end
+
+  defp consume_garbage(["!", c | rest]) do
+    [:escape, c] ++ consume_garbage(rest)
+  end
+
+  defp consume_garbage([">" | rest]) do
+    [:garbage_end] ++ tokenize(rest)
+  end
+
+  defp consume_garbage([c | rest]) do
+    [c] ++ consume_garbage(rest)
+  end
+
+  def score_groups(tokens) do
+    score_tokens(tokens, 0)
+  end
+
+  defp score_tokens([], _base_score), do: 0
+
+  defp score_tokens([:group_start | rest], base_score) do
+    0 + score_tokens(rest, base_score + 1)
+  end
+
+  defp score_tokens([:group_end | rest], base_score) do
+    base_score + score_tokens(rest, base_score - 1)
+  end
+
+  defp score_tokens([_c | rest], base_score), do: score_tokens(rest, base_score)
+
+  def collect_garbage(tokens) do
+    gather_garbage(tokens, false)
+  end
+
+  defp gather_garbage([:garbage_start | rest], _in_garbage) do
+    [] ++ gather_garbage(rest, true)
+  end
+
+  defp gather_garbage([:garbage_end | rest], _in_garbage) do
+    [] ++ gather_garbage(rest, false)
+  end
+
+  defp gather_garbage([:escape, _c | rest], in_garbage) do
+    [] ++ gather_garbage(rest, in_garbage)
+  end
+
+  defp gather_garbage([c | rest], in_garbage) do
+    prefix =
+      if in_garbage do
+        [c]
+      else
+        []
+      end
+
+    prefix ++ gather_garbage(rest, in_garbage)
+  end
+
+  defp gather_garbage([], _in_garbage), do: []
+end
+```
+
+## Part 01
+
+```elixir
+data
+|> GarbagePatch.tokenize()
+```
+
+## Part 02
+
+```elixir
+data
+|> GarbagePatch.tokenize()
+|> GarbagePatch.collect_garbage()
+|> length()
+```
