@@ -1,0 +1,85 @@
+# Day 05
+
+## Data
+
+```elixir
+instructions =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+  |> String.split("\n")
+  |> Enum.map(&String.to_integer/1)
+```
+
+```elixir
+defmodule Cpu do
+  def count_steps(insts) do
+    step_counter(insts, 0)
+  end
+
+  def modified_count_steps(insts) do
+    modified_step_counter(insts, 0)
+  end
+
+  defp step_counter(instructions, inst_counter, step_count \\ 0) do
+    modifier = instructions |> Enum.at(inst_counter)
+
+    # IO.puts(Enum.join(instructions, " "))
+    # are we out of bounds yet?
+    cond do
+      inst_counter + modifier < 0 ->
+        step_count + 1
+
+      inst_counter + modifier >= length(instructions) ->
+        step_count + 1
+
+      true ->
+        step_counter(
+          instructions |> List.update_at(inst_counter, fn v -> v + 1 end),
+          inst_counter + modifier,
+          step_count + 1
+        )
+    end
+  end
+
+  defp modified_step_counter(instructions, inst_counter, step_count \\ 0) do
+    modifier = instructions |> Enum.at(inst_counter)
+
+    # IO.puts(Enum.join(instructions, " "))
+    # are we out of bounds yet?
+    cond do
+      inst_counter + modifier < 0 ->
+        step_count + 1
+
+      inst_counter + modifier >= length(instructions) ->
+        step_count + 1
+
+      true ->
+        # our in place modifier changes based on how big our jump is
+        inst_modifier =
+          if modifier >= 3 do
+            -1
+          else
+            1
+          end
+
+        modified_step_counter(
+          instructions |> List.update_at(inst_counter, fn v -> v + inst_modifier end),
+          inst_counter + modifier,
+          step_count + 1
+        )
+    end
+  end
+end
+```
+
+## Part 01
+
+```elixir
+Cpu.count_steps(instructions)
+```
+
+## Part 02
+
+```elixir
+Cpu.modified_count_steps(instructions)
+```
