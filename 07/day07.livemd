@@ -1,0 +1,189 @@
+# Day 07
+
+## Data
+
+```elixir
+tower_data =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+```
+
+```elixir
+defmodule Tower do
+  def parse(tower_data) do
+    tower_data
+    |> String.split("\n")
+    |> Enum.map(&parse_entry/1)
+    |> child_to_parent()
+  end
+
+  defp child_to_parent(tower_data) do
+    # child to %{parent: n}
+    c_to_p =
+      tower_data
+      |> Enum.reject(fn %{children: c} -> Enum.empty?(c) end)
+      |> Enum.flat_map(fn %{children: c, name: n} ->
+        c
+        |> Enum.map(fn child -> {child, n} end)
+      end)
+      |> Map.new()
+
+    # now grab a map of weights for each child
+    c_to_w =
+      tower_data
+      |> Enum.map(fn %{name: n, weight: w} -> {n, w} end)
+      |> Map.new()
+
+    # now grab all the leaves, and compute weight and parent
+    tower_data
+    |> Enum.map(fn %{name: n} ->
+      {
+        n,
+        %{name: n, parent: Map.get(c_to_p, n), weight: Map.get(c_to_w, n)}
+      }
+    end)
+    |> Map.new()
+  end
+
+  defp parse_entry(entry) do
+    case String.split(entry, " -> ") do
+      [leaf] ->
+        %{children: []} |> Map.merge(parse_name(leaf))
+
+      [leaf, children] ->
+        %{children: String.split(children, ",") |> Enum.map(&String.trim/1)}
+        |> Map.merge(parse_name(leaf))
+    end
+  end
+
+  defp parse_name(name) do
+    %{"name" => n, "weight" => w} =
+      Regex.named_captures(~r/^(?<name>[a-zA-Z]+)\s+\((?<weight>[0-9]+)\)$/, name)
+
+    %{name: n, weight: String.to_integer(w)}
+  end
+
+  def root(tower) do
+    tower
+    |> Enum.filter(fn {_leaf, %{parent: p}} -> p == nil end)
+    |> Enum.map(fn {leaf, _} -> leaf end)
+    |> List.first()
+  end
+
+  def invert_tower(tower) do
+    # build an inverted (root to children) map
+    root = root(tower)
+
+    %{
+      name: root,
+      children: children_of(root, tower),
+      weight: tower |> Map.get(root) |> Map.get(:weight)
+    }
+  end
+
+  def weigh_tower(%{children: [], weight: w} = payload) do
+    payload |> Map.put(:total_weight, w)
+  end
+
+  def weigh_tower(%{children: c, weight: w} = payload) do
+    updated_children = c |> Enum.map(&weigh_tower/1)
+
+    Map.merge(
+      payload,
+      %{
+        children: updated_children,
+        total_weight:
+          w + (Enum.map(updated_children, fn %{total_weight: tw} -> tw end) |> Enum.sum())
+      }
+    )
+  end
+
+  defp children_of(root, tower) do
+    tower
+    |> Enum.filter(fn {_leaf, %{parent: p}} ->
+      p == root
+    end)
+    |> Enum.map(fn {leaf, %{weight: w}} ->
+      %{name: leaf, children: children_of(leaf, tower), weight: w}
+    end)
+  end
+
+  def rebalance_disc_weight(%{children: []}), do: -1
+
+  def rebalance_disc_weight(%{children: c}) do
+    # figure out if these children are unbalanced
+    if balanced?(c) do
+      # recurse
+      c
+      |> Enum.map(&rebalance_disc_weight/1)
+    else
+      Enum.map(c, fn %{total_weight: tw} -> tw end) |> IO.inspect(label: "unbalanced children")
+
+      # this is the unbalanced node, we need to calculate the rebalance weight
+      # and the recurse until we find the unbalanced node with sub-nodes
+      # that are balanced
+      unbalanced_node = min_group(c)
+      balanced_node = max_group(c)
+
+      # what's our weight change
+      weight_change =
+        (unbalanced_node.total_weight - balanced_node.total_weight)
+        |> IO.inspect(label: "weight_change")
+
+      find_unbalanced_node(unbalanced_node, weight_change)
+    end
+  end
+
+  defp find_unbalanced_node(%{children: c, weight: w}, weight_change) do
+    if balanced?(c) do
+      w - weight_change
+    else
+      c |> min_group() |> find_unbalanced_node(weight_change)
+    end
+  end
+
+  defp min_group(children) do
+    children
+    |> Enum.group_by(fn %{total_weight: tw} -> tw end)
+    |> Enum.min_by(fn {_w, entries} -> length(entries) end)
+    |> elem(1)
+    |> List.first()
+  end
+
+  defp max_group(children) do
+    children
+    |> Enum.group_by(fn %{total_weight: tw} -> tw end)
+    |> Enum.max_by(fn {_w, entries} -> length(entries) end)
+    |> elem(1)
+    |> List.first()
+  end
+
+  defp balanced?(nodes) do
+    ms =
+      nodes
+      |> Enum.map(fn %{total_weight: tw} -> tw end)
+      |> Enum.group_by(fn tw -> tw end)
+      |> map_size()
+
+    ms == 1
+  end
+end
+```
+
+## Part 01
+
+```elixir
+tower_data
+|> Tower.parse()
+|> Tower.root()
+```
+
+## Part 02
+
+```elixir
+tower_data
+|> Tower.parse()
+|> Tower.invert_tower()
+|> Tower.weigh_tower()
+|> Tower.rebalance_disc_weight()
+```
