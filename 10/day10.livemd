@@ -1,0 +1,109 @@
+# Day 10
+
+## Data
+
+```elixir
+knot = 0..255 |> Enum.to_list()
+
+lengths =
+  "#{__DIR__}/part01.dat" |> File.read!() |> String.split(",") |> Enum.map(&String.to_integer/1)
+
+ascii_lengths =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+  |> String.to_charlist()
+
+hash_seed = ascii_lengths ++ [17, 31, 73, 47, 23]
+```
+
+```elixir
+defmodule Knots do
+  def tie(knot, lengths) do
+    inner_tie(knot, lengths, 0, 0)
+  end
+
+  def hash(knot, seed, rounds \\ 64) do
+    # run our hashing rounds
+    %{knot: complete_knot} =
+      0..(rounds - 1)
+      |> Enum.reduce(
+        %{knot: knot, seed: seed, position: 0, skip_size: 0},
+        fn _round, %{knot: knot, seed: seed, position: position, skip_size: skip_size} ->
+          {new_knot, new_pos, new_skip} = inner_hash(knot, seed, position, skip_size)
+          %{knot: new_knot, seed: seed, position: new_pos, skip_size: new_skip}
+        end
+      )
+
+    # batch into sets of 16
+    complete_knot
+    |> Enum.chunk_every(16)
+    |> Enum.map(fn bytes ->
+      bytes
+      |> Enum.reduce(0, fn item, acc -> Bitwise.bxor(item, acc) end)
+      |> Integer.to_string(16)
+    end)
+    |> Enum.join("")
+    |> String.downcase()
+  end
+
+  defp inner_hash(knot, [], position, skip_size), do: {knot, position, skip_size}
+
+  defp inner_hash(knot, [len | lengths], position, skip_size) do
+    # calculate the reversed section, accounting for wrap around
+    rev = (knot ++ knot) |> Enum.drop(position) |> Enum.take(len) |> Enum.reverse()
+
+    # rebuild the knot
+    position..(len - 1 + position)
+    |> Enum.reduce(knot, fn pos, knot_acc ->
+      # which reversed element are we getting
+      rev_item = Enum.at(rev, pos - position)
+
+      # where is this reversed item going?
+      actual_pos = rem(pos, length(knot))
+
+      # update the knot
+      knot_acc |> List.update_at(actual_pos, fn _k -> rev_item end)
+    end)
+
+    # recurse
+    |> inner_hash(lengths, rem(position + len + skip_size, length(knot)), skip_size + 1)
+  end
+
+  defp inner_tie(knot, [], _position, _skip_size), do: knot
+
+  defp inner_tie(knot, [len | lengths], position, skip_size) do
+    # calculate the reversed section, accounting for wrap around
+    rev = (knot ++ knot) |> Enum.drop(position) |> Enum.take(len) |> Enum.reverse()
+
+    # rebuild the knot
+    position..(len - 1 + position)
+    |> Enum.reduce(knot, fn pos, knot_acc ->
+      # which reversed element are we getting
+      rev_item = Enum.at(rev, pos - position)
+
+      # where is this reversed item going?
+      actual_pos = rem(pos, length(knot))
+
+      # update the knot
+      knot_acc |> List.update_at(actual_pos, fn _k -> rev_item end)
+    end)
+
+    # recurse
+    |> inner_tie(lengths, rem(position + len + skip_size, length(knot)), skip_size + 1)
+  end
+end
+```
+
+## Part 01
+
+```elixir
+Knots.tie(knot, lengths)
+|> Enum.take(2)
+|> Enum.reduce(1, fn x, y -> x * y end)
+```
+
+## Part 02
+
+```elixir
+Knots.hash(knot, hash_seed)
+```
