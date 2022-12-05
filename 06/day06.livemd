@@ -1,0 +1,135 @@
+# Day 06
+
+## Data
+
+```elixir
+bank_values =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+  |> String.split("\t")
+  |> Enum.map(&String.to_integer/1)
+
+bank = %{
+  bank_count: length(bank_values),
+  banks: Enum.with_index(bank_values, fn element, index -> {index, element} end) |> Map.new()
+}
+```
+
+```elixir
+defmodule MemoryBank do
+  def rebalance_until_looped(bank) do
+    # we store a set of "seen" values as we loop
+    rul_inner(bank)
+  end
+
+  def rebalance_for_loop_size(bank) do
+    # we store a set of "seen" values as we loop
+    rfls_inner(bank)
+  end
+
+  defp rul_inner(bank, history \\ %{}, steps \\ 0) do
+    rebalanced = rebalance_once(bank)
+    b_hash = bank_hash(rebalanced)
+
+    if Map.has_key?(history, b_hash) do
+      steps + 1
+    else
+      rul_inner(
+        rebalanced,
+        history |> Map.put(b_hash, true),
+        steps + 1
+      )
+    end
+  end
+
+  defp rfls_inner(bank, history \\ %{}, steps \\ 0) do
+    rebalanced = rebalance_once(bank)
+    b_hash = bank_hash(rebalanced)
+
+    if Map.has_key?(history, b_hash) do
+      steps - Map.get(history, b_hash)
+    else
+      rfls_inner(
+        rebalanced,
+        history |> Map.put(b_hash, steps),
+        steps + 1
+      )
+    end
+  end
+
+  defp bank_hash(%{bank_count: c, banks: banks}) do
+    0..(c - 1)
+    |> Enum.map(fn idx -> Map.get(banks, idx) end)
+    |> Enum.join(",")
+  end
+
+  def rebalance_once(%{bank_count: c, banks: banks}) do
+    # find the biggest bank
+    big_bank = banks |> Enum.map(fn {_idx, v} -> v end) |> Enum.max()
+
+    # find the index of the max value
+    redist_from = 0..(c - 1) |> Enum.find_index(fn idx -> Map.get(banks, idx) == big_bank end)
+
+    # update the bank we're redistributing from
+    base_banks = banks |> Map.put(redist_from, 0)
+
+    # closed form break down of redistribution
+    redistributed_banks =
+      Enum.zip(
+        0..(c - 1) |> Enum.map(fn idx -> Map.get(base_banks, idx) end),
+        redist_cells(big_bank, c, redist_from + 1)
+      )
+      |> Enum.with_index()
+      |> Enum.map(fn {{current_cell, redist_cell}, idx} -> {idx, current_cell + redist_cell} end)
+      |> Map.new()
+
+    %{bank_count: c, banks: redistributed_banks}
+  end
+
+  defp redist_cells(bank_size, bank_count, next_cell) do
+    base = div(bank_size, bank_count)
+    extra = rem(bank_size, bank_count)
+
+    # setup the base value everyone will get
+    0..(bank_count - 1)
+    |> Enum.map(fn _idx ->
+      base
+    end)
+
+    # now we need to distribute the extra, starting from 
+    # a specific place
+    |> top_up_cells(extra, next_cell)
+  end
+
+  defp top_up_cells(cells, 0, _next_cell), do: cells
+
+  defp top_up_cells(cells, remainder, next_cell) do
+    top_up_idx =
+      if next_cell >= length(cells) do
+        0
+      else
+        next_cell
+      end
+
+    top_up_cells(
+      List.update_at(cells, top_up_idx, fn v -> v + 1 end),
+      remainder - 1,
+      top_up_idx + 1
+    )
+  end
+end
+```
+
+## Part 01
+
+```elixir
+bank
+|> MemoryBank.rebalance_until_looped()
+```
+
+## Part 02
+
+```elixir
+bank
+|> MemoryBank.rebalance_for_loop_size()
+```
