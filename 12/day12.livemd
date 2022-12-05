@@ -1,0 +1,73 @@
+# Day 12
+
+## Data
+
+```elixir
+data =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+```
+
+```elixir
+defmodule Pipes do
+  def parse(pipes) do
+    pipes
+    |> String.split("\n")
+    |> Enum.map(&parse_pipeline/1)
+    |> Map.new()
+  end
+
+  defp parse_pipeline(l) do
+    [left, rights] = l |> String.split(" <-> ")
+
+    conns =
+      rights |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.map(&String.to_integer/1)
+
+    {String.to_integer(left), conns}
+  end
+
+  def trace(pipes, root) do
+    trace(pipes, [root], MapSet.new())
+  end
+
+  defp trace(_pipes, [], acc), do: acc
+
+  defp trace(pipes, [root | rest], acc) do
+    # what connects do we have
+    available = pipes |> Map.get(root)
+
+    # figure out where we're going next
+    next =
+      available
+      |> Enum.reject(fn leaf -> MapSet.member?(acc, leaf) end)
+
+    # add our available to our set
+    trace(pipes, next ++ rest, available |> MapSet.new() |> MapSet.union(acc))
+  end
+
+  def find_groups(pipes) do
+    pipes
+    |> Map.keys()
+    |> Enum.map(fn root -> trace(pipes, root) end)
+    |> Enum.uniq()
+  end
+end
+```
+
+## Part 01
+
+```elixir
+data
+|> Pipes.parse()
+|> Pipes.trace(0)
+|> MapSet.size()
+```
+
+## Part 02
+
+```elixir
+data
+|> Pipes.parse()
+|> Pipes.find_groups()
+|> length()
+```
