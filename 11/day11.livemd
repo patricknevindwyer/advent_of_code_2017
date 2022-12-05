@@ -1,0 +1,74 @@
+# Day 11
+
+## Data
+
+```elixir
+data = "#{__DIR__}/part01.dat" |> File.read!() |> String.split(",") |> Enum.map(&String.to_atom/1)
+```
+
+```elixir
+defmodule HexGrid do
+  def walk(_dirs, pq \\ 0, pr \\ 0, ps \\ 0)
+  def walk([], pq, pr, ps), do: {pq, pr, ps}
+
+  def walk([dir | rest], pq, pr, ps) do
+    {dq, dr, ds} =
+      case dir do
+        :n -> {0, -1, 1}
+        :s -> {0, 1, -1}
+        :ne -> {1, -1, 0}
+        :se -> {1, 0, -1}
+        :nw -> {-1, 0, 1}
+        :sw -> {-1, 1, 0}
+      end
+
+    walk(rest, pq + dq, pr + dr, ps + ds)
+  end
+
+  def furthest(_dirs, _max_dist \\ 0, pq \\ 0, pr \\ 0, ps \\ 0)
+  def furthest([], max_dist, _pq, _pr, _ps), do: max_dist
+
+  def furthest([dir | rest], max_dist, pq, pr, ps) do
+    {dq, dr, ds} =
+      case dir do
+        :n -> {0, -1, 1}
+        :s -> {0, 1, -1}
+        :ne -> {1, -1, 0}
+        :se -> {1, 0, -1}
+        :nw -> {-1, 0, 1}
+        :sw -> {-1, 1, 0}
+      end
+
+    # location
+    nq = pq + dq
+    nr = pr + dr
+    ns = ps + ds
+
+    # did we hit a new max distance?
+    dist = distance({nq, nr, ns})
+    max_dist = max(max_dist, dist)
+    furthest(rest, max_dist, pq + dq, pr + dr, ps + ds)
+  end
+
+  def distance({q, r, s}) do
+    # qsr distance
+    #  return (abs(vec.q) + abs(vec.r) + abs(vec.s)) / 2
+    div(abs(q) + abs(r) + abs(s), 2)
+  end
+end
+```
+
+## Part 01
+
+```elixir
+data
+|> HexGrid.walk()
+|> HexGrid.distance()
+```
+
+## Part 02
+
+```elixir
+data
+|> HexGrid.furthest()
+```
