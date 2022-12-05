@@ -1,0 +1,119 @@
+# Day 08
+
+## Data
+
+Example:
+
+```
+b inc 5 if a > 1
+a inc 1 if b < 5
+c dec -10 if a >= 1
+c inc -20 if c == 10
+```
+
+```elixir
+instructions =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+```
+
+```elixir
+defmodule Registers do
+  def parse_instructions(raw) do
+    raw
+    |> String.split("\n")
+    |> Enum.map(&parse_instruction/1)
+  end
+
+  defp parse_instruction(inst) do
+    %{
+      "register" => r,
+      "amount" => amt,
+      "op" => op,
+      "conditional_register" => c,
+      "comparator" => comp,
+      "operand" => operand
+    } =
+      Regex.named_captures(
+        ~r/^(?<register>[a-zA-Z]+)\s+(?<op>inc|dec)\s+(?<amount>[\-0-9]+)\s+if\s+(?<conditional_register>[a-zA-Z]+)\s+(?<comparator>[<>=!]+)\s+(?<operand>[\-0-9]+)$/,
+        inst
+      )
+
+    %{
+      register: r,
+      amount: String.to_integer(amt),
+      op: String.to_atom(op),
+      conditional: %{
+        register: c,
+        comparator: comp,
+        value: String.to_integer(operand)
+      }
+    }
+  end
+
+  def evaluate_registers(instructions) do
+    eval_instructions(%{}, instructions, %{max: 0})
+  end
+
+  defp eval_instructions(registers, [], check), do: %{registers: registers, check: check}
+
+  defp eval_instructions(
+         registers,
+         [%{conditional: conditional, amount: a, op: o, register: r} | rest],
+         %{max: max_value} = check
+       ) do
+    {registers, check} =
+      if condition?(registers, conditional) do
+        update =
+          Map.get(registers, r, 0)
+          |> modify_register_value(o, a)
+
+        updated_reg =
+          registers
+          |> Map.put(r, update)
+
+        updated_check =
+          if update > max_value do
+            %{max: update}
+          else
+            check
+          end
+
+        {updated_reg, updated_check}
+      else
+        {registers, check}
+      end
+
+    eval_instructions(registers, rest, check)
+  end
+
+  defp condition?(registers, %{comparator: c, register: r, value: v}) do
+    reg = Map.get(registers, r, 0)
+    apply(Kernel, String.to_atom(c), [reg, v])
+  end
+
+  defp modify_register_value(v, :inc, a), do: v + a
+  defp modify_register_value(v, :dec, a), do: v - a
+end
+```
+
+## Part 01
+
+```elixir
+instructions
+|> Registers.parse_instructions()
+|> Registers.evaluate_registers()
+|> Map.get(:registers)
+|> Enum.map(fn {_k, v} -> v end)
+|> Enum.max()
+```
+
+## Part 02
+
+```elixir
+instructions
+|> Registers.parse_instructions()
+|> Registers.evaluate_registers()
+|> Map.get(:check)
+|> Map.get(:max)
+```
