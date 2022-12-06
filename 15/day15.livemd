@@ -1,0 +1,91 @@
+# Day 15
+
+## Data
+
+```elixir
+gen_a_init = 783
+gen_a_factor = 16807
+
+gen_b_init = 325
+gen_b_factor = 48271
+```
+
+```elixir
+defmodule Generator do
+  def cycle(seed, factor) do
+    rem(seed * factor, 2_147_483_647)
+  end
+
+  def run_cycle({a_init, a_factor}, {b_init, b_factor}, cycles) do
+    0..(cycles - 1)
+    |> Enum.reduce(
+      {a_init, b_init, 0},
+      fn _idx, {last_a, last_b, matches} ->
+        next_a = rem(last_a * a_factor, 2_147_483_647)
+        next_b = rem(last_b * b_factor, 2_147_483_647)
+
+        next_matches =
+          if Bitwise.band(next_a, 65535) == Bitwise.band(next_b, 65535) do
+            matches + 1
+          else
+            matches
+          end
+
+        {next_a, next_b, next_matches}
+      end
+    )
+  end
+
+  def run_multiples_cycle({a_init, a_factor, a_check}, {b_init, b_factor, b_check}, cycles) do
+    0..(cycles - 1)
+    |> Enum.reduce(
+      {a_init, b_init, 0},
+      fn _idx, {last_a, last_b, matches} ->
+        next_a = next_candidate(last_a, a_factor, a_check)
+        next_b = next_candidate(last_b, b_factor, b_check)
+
+        next_matches =
+          if Bitwise.band(next_a, 65535) == Bitwise.band(next_b, 65535) do
+            matches + 1
+          else
+            matches
+          end
+
+        {next_a, next_b, next_matches}
+      end
+    )
+  end
+
+  def next_candidate(seed, factor, bit_check) do
+    n = rem(seed * factor, 2_147_483_647)
+
+    if Bitwise.band(n, bit_check) == 0 do
+      n
+    else
+      next_candidate(n, factor, bit_check)
+    end
+  end
+end
+```
+
+## Part 01
+
+```elixir
+Generator.run_cycle(
+  {gen_a_init, gen_a_factor},
+  {gen_b_init, gen_b_factor},
+  40_000_000
+)
+|> elem(2)
+```
+
+## Part 02
+
+```elixir
+Generator.run_multiples_cycle(
+  {gen_a_init, gen_a_factor, 3},
+  {gen_b_init, gen_b_factor, 7},
+  5_000_000
+)
+|> elem(2)
+```

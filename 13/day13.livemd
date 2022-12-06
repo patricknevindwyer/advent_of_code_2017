@@ -1,0 +1,183 @@
+# Day 13
+
+```elixir
+Mix.install([
+  {:memoize, "~> 1.4"}
+])
+```
+
+## Data
+
+```elixir
+data =
+  "#{__DIR__}/part01.dat"
+  |> File.read!()
+```
+
+```elixir
+defmodule Scanner do
+  use Memoize
+
+  def parse(scan_config) do
+    scan_config
+    |> String.split("\n")
+    |> Enum.map(fn line ->
+      [depth, range] =
+        line |> String.split(":") |> Enum.map(&String.trim/1) |> Enum.map(&String.to_integer/1)
+
+      {depth, %{depth: depth, range: range, at: 0, dir: 1}}
+    end)
+    |> Map.new()
+  end
+
+  def find_delay(scanner) do
+    1000..10_000_000
+    |> Enum.reduce_while(%{scanner: scanner}, fn delay, %{scanner: scanner} ->
+      caught_at =
+        scanner
+        |> step_scanner_to(delay)
+        |> traverse(true)
+        |> IO.inspect(label: "find delay at #{delay}")
+
+      if Enum.empty?(caught_at) do
+        {:halt, delay}
+      else
+        {:cont, %{scanner: scanner}}
+      end
+    end)
+  end
+
+  # defp ff_scanner(scanner, steps) do
+  #   0..(steps - 1)
+  #   |> Enum.reduce(scanner, fn _step, scanner -> 
+  #     {_p, _c, u_scanner} = step_scanner(scanner, 0)
+  #     u_scanner
+  #   end)
+  # end
+
+  # defmemo ff_scanner(scanner, 0) do
+  #   {_p, _c, u_scanner} = step_scanner(scanner, 0)
+  #   u_scanner
+  # end
+
+  # defmemo ff_scanner(scanner, n) do
+  #   {_p, _c, u_scanner} = ff_scanner(scanner, n - 1) |> step_scanner(0)
+  #   u_scanner
+  # end
+
+  def traverse(scanner, halt_on_catch \\ false) do
+    0..100
+    |> Enum.reduce_while(
+      %{scanner: scanner, packet: -1, caught_at_depth: []},
+      fn _idx, %{scanner: scanner, packet: packet, caught_at_depth: caught} ->
+        # step the scanner
+        {new_packet_location, was_caught, new_scanner} = step_scanner(scanner, packet)
+
+        # were we caught?
+        catch_count =
+          if was_caught do
+            caught ++ [new_packet_location]
+          else
+            caught
+          end
+
+        # are we done?
+        max_depth = scanner |> Map.keys() |> Enum.max()
+
+        if new_packet_location > max_depth do
+          {:halt, catch_count}
+        else
+          if halt_on_catch && !Enum.empty?(catch_count) do
+            {:halt, catch_count}
+          else
+            {:cont,
+             %{scanner: new_scanner, packet: new_packet_location, caught_at_depth: catch_count}}
+          end
+        end
+      end
+    )
+  end
+
+  def depth_to_score(depths, scanner) do
+    depths
+    |> Enum.map(fn depth ->
+      range = scanner |> Map.get(depth) |> Map.get(:range)
+      depth * range
+    end)
+    |> Enum.sum()
+  end
+
+  def step_scanner_to(scanner, timestep) do
+    scanner
+    |> Enum.map(fn {idx, %{range: r} = payload} ->
+      # how far do we need to step this scanner column
+      remaining = rem(timestep, 2 * (r - 1))
+
+      {new_at, move_dir} =
+        if remaining < r do
+          {remaining, 1}
+        else
+          {2 * r - remaining - 1, -1}
+        end
+
+      {idx, payload |> Map.merge(%{at: new_at, dir: move_dir})}
+    end)
+    |> Map.new()
+    |> IO.inspect(label: "scanner stepped to #{timestep}")
+  end
+
+  def step_scanner(scanner, packet_location) do
+    # step scanner forward
+    packet_location = packet_location + 1
+
+    # did we hit a scanner?
+    caught =
+      case scanner |> Map.get(packet_location, nil) do
+        nil -> false
+        %{at: 0} -> true
+        _ -> false
+      end
+
+    # update scanner positions
+    u_scanner =
+      scanner
+      |> Enum.map(fn {idx, %{at: a, range: r, dir: dir} = payload} ->
+        # do we need to keep moving
+        move_dir =
+          cond do
+            a + dir >= r -> dir * -1
+            a + dir < 0 -> dir * -1
+            true -> dir
+          end
+
+        {idx, payload |> Map.merge(%{at: a + move_dir, dir: move_dir})}
+      end)
+      |> Map.new()
+
+    {packet_location, caught, u_scanner}
+  end
+end
+```
+
+## Part 01
+
+```elixir
+scanner =
+  data
+  |> Scanner.parse()
+
+scanner
+|> Scanner.traverse()
+|> Scanner.depth_to_score(scanner)
+```
+
+## Part 02
+
+```elixir
+scanner =
+  data
+  |> Scanner.parse()
+
+scanner
+|> Scanner.find_delay()
+```
