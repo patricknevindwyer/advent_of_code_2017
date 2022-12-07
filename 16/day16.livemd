@@ -1,0 +1,99 @@
+# Day 16
+
+## Data
+
+```elixir
+data = "#{__DIR__}/part01.dat" |> File.read!()
+group = "abcdefghijklmnop" |> String.graphemes() |> Enum.take(16)
+```
+
+```elixir
+defmodule Dance do
+  def parse_moves(raw) do
+    raw
+    |> String.split(",")
+    |> Enum.map(&parse_move/1)
+  end
+
+  defp parse_move("s" <> rest), do: {:spin, String.to_integer(rest)}
+
+  defp parse_move("x" <> rest) do
+    [s, e] = String.split(rest, "/")
+    {:exchange, String.to_integer(s), String.to_integer(e)}
+  end
+
+  defp parse_move("p" <> rest) do
+    [s, e] = String.split(rest, "/")
+    {:partner, s, e}
+  end
+
+  def dance_off(group, moves, cycles \\ 1_000_000_000) do
+    # find our cycle size
+    cycle_size = inner_dance(group, moves, group, 1)
+
+    further = rem(cycles, cycle_size - 1)
+
+    0..(further - 1)
+    |> Enum.reduce(group, fn _idx, acc_group ->
+      acc_group |> dance(moves)
+    end)
+  end
+
+  def inner_dance(group, moves, init_group, cycle_count) do
+    n_group = dance(group, moves)
+
+    if group == init_group && cycle_count > 1 do
+      cycle_count
+    else
+      inner_dance(n_group, moves, init_group, cycle_count + 1)
+    end
+  end
+
+  def dance(group, []), do: group
+
+  def dance(group, [move | moves]) do
+    group
+    |> move(move)
+    |> dance(moves)
+  end
+
+  defp move(group, {:spin, count}) do
+    {s, e} = group |> Enum.split(length(group) - count)
+    e ++ s
+  end
+
+  defp move(group, {:exchange, a, b}) do
+    at_a = group |> Enum.at(a)
+    at_b = group |> Enum.at(b)
+
+    group
+    |> List.update_at(a, fn _v -> at_b end)
+    |> List.update_at(b, fn _v -> at_a end)
+  end
+
+  defp move(group, {:partner, a, b}) do
+    a_idx = group |> Enum.find_index(fn v -> v == a end)
+    b_idx = group |> Enum.find_index(fn v -> v == b end)
+    move(group, {:exchange, a_idx, b_idx})
+  end
+end
+```
+
+## Part 01
+
+```elixir
+moves =
+  data
+  |> Dance.parse_moves()
+
+Dance.dance(group, moves)
+|> Enum.join("")
+```
+
+## Part 01
+
+```elixir
+moves = data |> Dance.parse_moves()
+
+Dance.dance_off(group, moves) |> Enum.join("")
+```
